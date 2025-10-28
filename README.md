@@ -1,2 +1,3 @@
-# COMP121
-COMP121 Documents
+# General Notes
+Starting a project
+
