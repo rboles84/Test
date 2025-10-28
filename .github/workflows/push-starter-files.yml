@@ -32,7 +32,7 @@ jobs:
           cat > README.md <<'EOF'
 # Test Case Generator - RAG + Master Orchestration Prompt (starter)
 
-This repository contains starter code and templates for building a Retrieval-Augmented Generation (RAG) system with a Master Orchestration Prompt (MOP) to generate standard, repeatable test cases from acceptance criteria, Jira tickets, and other test artifacts (ISTQB PDFs, white papers, business rules, etc).
+# This repository contains starter code and templates for building a Retrieval-Augmented Generation (RAG) system with a Master Orchestration Prompt (MOP) to generate standard, repeatable test cases from acceptance criteria, Jira tickets, and other test artifacts (ISTQB PDFs, white papers, business rules, etc).
 
 Key components:
 - Ingest: extract text from PDFs/URLs/Jira and index into a vector store
