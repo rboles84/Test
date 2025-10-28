@@ -1,5 +1,3 @@
-# Run this manually (workflow_dispatch). It will create branch setup-rag-mop and commit starter files,
-# using the PAT stored in the repository secret COPILOT_PUSH_TOKEN.
 name: Push RAG+MOP starter files
 
 on:
@@ -9,30 +7,92 @@ jobs:
   push-files:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (minimal)
+      - name: Checkout (full)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configure git
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-      - name: Create branch and write files
+      - name: Create branch & add starter files via GitHub API
+        uses: actions/github-script@v6
         env:
-          PUSH_TOKEN: ${{ secrets.COPILOT_PUSH_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -e
-          BRANCH=setup-rag-mop
-          git checkout -b "$BRANCH"
+          # uses GITHUB_TOKEN provided by Actions runner
+          # The PAT secret is not needed with this approach (GITHUB_TOKEN has rights to create refs & files)
+          # Keep COPILOT_PUSH_TOKEN as-is in case you want the previous approach; not used here.
+          COPILOT_PUSH_TOKEN: ${{ secrets.COPILOT_PUSH_TOKEN }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const branch = 'setup-rag-mop';
 
-          # README
-          cat > README.md <<'EOF'
-# Test Case Generator - RAG + Master Orchestration Prompt (starter)
+            // Get the main branch SHA to branch from
+            const mainRef = await github.rest.git.getRef({
+              owner,
+              repo,
+              ref: 'heads/main'
+            }).catch(err => {
+              core.warning('Failed to get main ref: ' + err.message);
+              throw err;
+            });
 
-# This repository contains starter code and templates for building a Retrieval-Augmented Generation (RAG) system with a Master Orchestration Prompt (MOP) to generate standard, repeatable test cases from acceptance criteria, Jira tickets, and other test artifacts (ISTQB PDFs, white papers, business rules, etc).
+            const sha = mainRef.data.object.sha;
+
+            // Create the new branch (ignore if exists)
+            try {
+              await github.rest.git.createRef({
+                owner,
+                repo,
+                ref: 'refs/heads/' + branch,
+                sha
+              });
+              core.info(`Created branch ${branch}`);
+            } catch (err) {
+              if (err.status === 422) {
+                core.info(`Branch ${branch} already exists; continuing`);
+              } else {
+                throw err;
+              }
+            }
+
+            // Utility to create/update a file on the branch
+            async function putFile(path, content, message) {
+              const encoded = Buffer.from(content, 'utf8').toString('base64');
+              // Check if file exists on branch
+              let existing = null;
+              try {
+                existing = await github.rest.repos.getContent({
+                  owner,
+                  repo,
+                  path,
+                  ref: branch
+                });
+              } catch (err) {
+                if (err.status !== 404) throw err;
+              }
+
+              const params = {
+                owner,
+                repo,
+                path,
+                message,
+                content: encoded,
+                branch
+              };
+              if (existing && existing.data && existing.data.sha) {
+                params.sha = existing.data.sha;
+                await github.rest.repos.createOrUpdateFileContents(params);
+                core.info(`Updated ${path}`);
+              } else {
+                await github.rest.repos.createOrUpdateFileContents(params);
+                core.info(`Created ${path}`);
+              }
+            }
+
+            // Files to create (small/medium text files). Update contents as needed.
+            const files = {
+              'README.md': `# Test Case Generator - RAG + Master Orchestration Prompt (starter)
+
+This repository contains starter code and templates for building a Retrieval-Augmented Generation (RAG) system with a Master Orchestration Prompt (MOP) to generate standard, repeatable test cases from acceptance criteria, Jira tickets, and other test artifacts (ISTQB PDFs, white papers, business rules, etc).
 
 Key components:
 - Ingest: extract text from PDFs/URLs/Jira and index into a vector store
@@ -41,23 +101,21 @@ Key components:
 - Generator: coordinates retriever + MOP + LLM to produce final test cases
 - Evaluation: automated checks and human-in-the-loop feedback
 
-# Getting started
-# 1. Add repo secrets (see ARCHITECTURE.md)
-# 2. Install dependencies (see requirements.txt)
-# 3. Configure vector DB (Chroma, Pinecone, Weaviate, or FAISS)
-# 4. Run ingestion over your PDFs and artifacts: `python -m src.ingest path/to/file.pdf`
-# 5. Run generation: `python -m src.generate --ticket "./examples/ticket.json"`
+Getting started
+1. Add repo secrets (see ARCHITECTURE.md)
+2. Install dependencies (see requirements.txt)
+3. Configure vector DB (Chroma, Pinecone, Weaviate, or FAISS)
+4. Run ingestion over your PDFs and artifacts: \`python -m src.ingest path/to/file.pdf\`
+5. Run generation: \`python -m src.generate --ticket "./examples/ticket.json"\`
 
-# See ARCHITECTURE.md for design decisions, and prompts/mop_template.md for the MOP.
+See ARCHITECTURE.md for design decisions, and prompts/mop_template.md for the MOP.
 
-# License: MIT
-# EOF
+License: MIT
+`,
 
-#           # ARCHITECTURE.md
-#           cat > ARCHITECTURE.md <<'EOF'
-# # Architecture & Setup Notes
+              'ARCHITECTURE.md': `# Architecture & Setup Notes
 
-Overview:
+Overview
 - Ingest pipeline: convert PDFs, HTML, Jira tickets, and spreadsheets into plain text, enrich with metadata (source, page, doc-type), chunk text, compute embeddings, and upsert to a vector store.
 - Vector store: persistent store for embeddings (Chroma, Pinecone, Weaviate, or FAISS on disk).
 - Retriever: semantic search layer returning top-N chunks plus metadata for context.
@@ -85,31 +143,9 @@ GitHub setup
 Security & data handling
 - Do NOT commit PDFs or PII into the repository. Use cloud storage (S3) or private artifact store and reference locations in metadata.
 - Consider using encryption and access controls for vector DB if it contains proprietary info.
+`,
 
-Input formats supported
-- Acceptance criteria (structured text)
-- Jira ticket JSON
-- PDF (standards: ISTQB, white papers)
-- HTML/webpages (URLs)
-- Business rules CSV/Excel
-
-Output schema (example JSON)
-{
-  "title": "...",
-  "preconditions": [...],
-  "test_steps": [
-    {"step": 1, "action": "...", "expected_result": "...", "data": {...}}
-  ],
-  "priority": "High/Medium/Low",
-  "tags": ["regression", "security"],
-  "source": "JIRA-1234",
-  "confidence": 0.87
-}
-EOF
-
-          # requirements and .gitignore
-          cat > requirements.txt <<'EOF'
-langchain>=0.0.400
+              'requirements.txt': `langchain>=0.0.400
 openai>=1.0.0
 tiktoken
 pypdf
@@ -121,8 +157,267 @@ uvicorn
 pytest
 python-dotenv
 requests
-EOF
+`,
 
-          cat > .gitignore <<'EOF'
-.env
-__pycache
+              '.gitignore': `.env
+__pycache__/
+*.pyc
+.vscode/
+.chromadb/
+data/
+uploads/
+`,
+
+              '.github/workflows/ci.yml': `name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Lint (simple)
+        run: |
+          python -m pyflakes src || true
+      - name: Run tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          pytest -q
+`,
+
+              'src/ingest.py': `"""
+Simple ingestion script:
+- extracts text from PDFs
+- chunks text
+- computes embeddings and upserts to a vector store (Chroma example)
+"""
+
+import os
+from typing import List, Dict
+from pypdf import PdfReader
+from sentence_transformers import SentenceTransformer
+import chromadb
+from chromadb.config import Settings
+
+CHROMA_DIR = os.getenv("CHROMA_DB_DIR", ".chromadb")
+EMBED_MODEL_NAME = "all-MiniLM-L6-v2"
+
+def extract_text_from_pdf(path: str) -> List[Dict]:
+    reader = PdfReader(path)
+    pages = []
+    for i, page in enumerate(reader.pages, start=1):
+        text = page.extract_text() or ""
+        pages.append({"page": i, "text": text, "source": os.path.basename(path)})
+    return pages
+
+def chunk_text(text: str, chunk_size: int = 800, overlap: int = 100):
+    tokens = text.split()
+    chunks = []
+    i = 0
+    while i < len(tokens):
+        chunk = " ".join(tokens[i:i+chunk_size])
+        chunks.append(chunk)
+        i += chunk_size - overlap
+    return chunks
+
+def ingest_pdf(path: str):
+    documents = extract_text_from_pdf(path)
+    embedder = SentenceTransformer(EMBED_MODEL_NAME)
+    client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet", persist_directory=CHROMA_DIR))
+    collection = client.get_or_create_collection("test_documents")
+    ids, metadatas, docs, embeddings = [], [], [], []
+    for doc in documents:
+        for chunk in chunk_text(doc["text"]):
+            ids.append(f"{doc['source']}_p{doc['page']}_{len(ids)}")
+            metadatas.append({"source": doc["source"], "page": doc["page"]})
+            docs.append(chunk)
+            embeddings.append(embedder.encode(chunk).tolist())
+    collection.add(ids=ids, documents=docs, metadatas=metadatas, embeddings=embeddings)
+    client.persist()
+    print(f"Ingested {len(ids)} chunks from {path}")
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("Usage: python -m src.ingest path/to/file.pdf")
+        sys.exit(1)
+    ingest_pdf(sys.argv[1])
+`,
+
+              'src/retriever.py': `"""
+Retriever that queries the vector store and returns top-k chunks with metadata.
+"""
+
+import os
+from sentence_transformers import SentenceTransformer
+import chromadb
+from chromadb.config import Settings
+
+CHROMA_DIR = os.getenv("CHROMA_DB_DIR", ".chromadb")
+EMBED_MODEL_NAME = "all-MiniLM-L6-v2"
+
+class Retriever:
+    def __init__(self, collection_name="test_documents"):
+        self.embedder = SentenceTransformer(EMBED_MODEL_NAME)
+        self.client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet", persist_directory=CHROMA_DIR))
+        self.collection = self.client.get_collection(collection_name)
+
+    def retrieve(self, query: str, top_k: int = 5):
+        q_emb = self.embedder.encode(query).tolist()
+        results = self.collection.query(query_embeddings=[q_emb], n_results=top_k, include=['metadatas','documents','distances'])
+        hits = []
+        for doc, meta, dist in zip(results['documents'][0], results['metadatas'][0], results['distances'][0]):
+            hits.append({"text": doc, "metadata": meta, "distance": dist})
+        return hits
+
+if __name__ == "__main__":
+    r = Retriever()
+    print(r.retrieve("What are the ISTQB definitions of equivalence partitioning?", top_k=3))
+`,
+
+              'src/generate.py': `"""
+Generator that composes the MOP + retrieved context and calls OpenAI to produce structured test cases.
+This is a minimal example; you'll want to add retries, streaming, verifier steps, and schema validation.
+"""
+
+import os
+import json
+import argparse
+from openai import OpenAI
+from src.retriever import Retriever
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+MODEL = os.getenv("GEN_MODEL", "gpt-4o-mini")  # replace with available model
+
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+def load_mop_template():
+    with open("prompts/mop_template.md", "r", encoding="utf-8") as f:
+        return f.read()
+
+def build_prompt(mop_template: str, ticket_text: str, retrieved_chunks):
+    context = "\\n\\n---\\n\\n".join([f"SOURCE: {r['metadata'].get('source','')}\\nPAGE: {r['metadata'].get('page','')}\\n\\n{r['text']}" for r in retrieved_chunks])
+    return mop_template.replace("{{TICKET}}", ticket_text).replace("{{CONTEXT}}", context)
+
+def generate_test_cases(ticket_text: str, top_k: int = 5):
+    r = Retriever()
+    retrieved = r.retrieve(ticket_text, top_k=top_k)
+    mop = load_mop_template()
+    prompt = build_prompt(mop, ticket_text, retrieved)
+    response = client.responses.create(model=MODEL, input=prompt, max_tokens=1500)
+    # For older openai clients, response structure may differ; return raw for now
+    if hasattr(response, "output_text"):
+        return response.output_text
+    try:
+        return response["choices"][0]["message"]["content"]
+    except Exception:
+        return str(response)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ticket", type=str, required=True, help="Path to a ticket text/json file or inline string")
+    args = parser.parse_args()
+    ticket_text = open(args.ticket).read() if os.path.exists(args.ticket) else args.ticket
+    out = generate_test_cases(ticket_text)
+    print(out)
+`,
+
+              'prompts/mop_template.md': `# Master Orchestration Prompt (MOP) - template
+
+SYSTEM INSTRUCTIONS:
+You are a disciplined test-case generator assistant. Your output MUST be JSON that exactly matches the "OUTPUT_SCHEMA" below. Use only the retrieved CONTEXT when it is relevant. If the CONTEXT contradicts the ticket, note the contradiction in "notes".
+
+INPUT:
+- TICKET: {{TICKET}}   <-- the acceptance criteria or ticket text will be inserted here
+- CONTEXT: {{CONTEXT}} <-- the retrieved artifacts (ISTQB, white papers, rules, etc.) will be inserted here
+
+STEPS (enforce this sequence):
+1) Summarize the ticket in one sentence.
+2) Extract preconditions and assumptions from the ticket and relevant CONTEXT.
+3) Identify functional items and acceptance criteria keywords (e.g., boundary values, error paths, workflows).
+4) Create a prioritized list of test scenarios (brief description + rationale + risk).
+5) For each test scenario, expand into test cases using the OUTPUT_SCHEMA (step number, action, expected result, test data if applicable).
+6) For each test case add source references (which CONTEXT chunk or ticket line supported this step).
+7) Validate: ensure each expected result is testable (assertable); if not, add a "clarification_needed" flag.
+
+OUTPUT_SCHEMA (strict JSON):
+{
+  "ticket_summary": "string",
+  "preconditions": ["string"],
+  "assumptions": ["string"],
+  "scenarios": [
+    {
+      "id": "S1",
+      "title": "string",
+      "priority": "High|Medium|Low",
+      "rationale": "string",
+      "test_cases": [
+        {
+          "id": "S1-T1",
+          "step": 1,
+          "action": "string",
+          "expected_result": "string",
+          "test_data": { "field": "value" },
+          "source_references": ["source:page"],
+          "clarification_needed": false
+        }
+      ]
+    }
+  ],
+  "notes": "string",
+  "confidence": 0.0
+}
+
+RESPONSE:
+- Return only valid JSON that conforms to OUTPUT_SCHEMA. Do not include any extra text.
+- If you cannot produce a valid output, return a JSON with notes explaining why and confidence 0.0.
+`,
+
+              'docs/acceptance_criteria_template.md': `# Acceptance Criteria / Ticket Template
+
+Provide acceptance criteria in a consistent format. Example:
+
+Title: Allow user to reset password via email
+
+Description:
+- User clicks "Forgot password"
+- App requests user's email and sends a reset link valid for 30 minutes
+- Reset link should be single-use
+- Token length must be at least 32 characters and be cryptographically random
+- Show user-friendly messages for invalid or expired tokens
+
+Acceptance Criteria (bullets):
+- AC1: A user can request a password reset by providing a registered email.
+- AC2: The system sends an email with a one-time use link valid for 30 minutes.
+- AC3: Using the link allows the user to set a new password.
+- AC4: Link cannot be reused.
+
+Tags: security, regression
+
+Priority: High
+
+Example usage:
+- Save this as ticket.json and pass to generator: \`python -m src.generate --ticket examples/ticket.json\`
+`
+            };
+
+            // Iterate and create/update files on the branch
+            for (const [path, content] of Object.entries(files)) {
+              await putFile(path, content, `chore: add ${path} (RAG+MOP starter)`);
+            }
+
+            core.info('All files created/updated on branch ' + branch);
