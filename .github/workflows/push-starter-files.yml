@@ -41,23 +41,23 @@ Key components:
 - Generator: coordinates retriever + MOP + LLM to produce final test cases
 - Evaluation: automated checks and human-in-the-loop feedback
 
-Getting started
-1. Add repo secrets (see ARCHITECTURE.md)
-2. Install dependencies (see requirements.txt)
-3. Configure vector DB (Chroma, Pinecone, Weaviate, or FAISS)
-4. Run ingestion over your PDFs and artifacts: `python -m src.ingest path/to/file.pdf`
-5. Run generation: `python -m src.generate --ticket "./examples/ticket.json"`
+# Getting started
+# 1. Add repo secrets (see ARCHITECTURE.md)
+# 2. Install dependencies (see requirements.txt)
+# 3. Configure vector DB (Chroma, Pinecone, Weaviate, or FAISS)
+# 4. Run ingestion over your PDFs and artifacts: `python -m src.ingest path/to/file.pdf`
+# 5. Run generation: `python -m src.generate --ticket "./examples/ticket.json"`
 
-See ARCHITECTURE.md for design decisions, and prompts/mop_template.md for the MOP.
+# See ARCHITECTURE.md for design decisions, and prompts/mop_template.md for the MOP.
 
-License: MIT
-EOF
+# License: MIT
+# EOF
 
-          # ARCHITECTURE.md
-          cat > ARCHITECTURE.md <<'EOF'
-# Architecture & Setup Notes
+#           # ARCHITECTURE.md
+#           cat > ARCHITECTURE.md <<'EOF'
+# # Architecture & Setup Notes
 
-Overview
+Overview:
 - Ingest pipeline: convert PDFs, HTML, Jira tickets, and spreadsheets into plain text, enrich with metadata (source, page, doc-type), chunk text, compute embeddings, and upsert to a vector store.
 - Vector store: persistent store for embeddings (Chroma, Pinecone, Weaviate, or FAISS on disk).
 - Retriever: semantic search layer returning top-N chunks plus metadata for context.
