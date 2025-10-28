@@ -1,0 +1,128 @@
+# Run this manually (workflow_dispatch). It will create branch setup-rag-mop and commit starter files,
+# using the PAT stored in the repository secret COPILOT_PUSH_TOKEN.
+name: Push RAG+MOP starter files
+
+on:
+  workflow_dispatch:
+
+jobs:
+  push-files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (minimal)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Create branch and write files
+        env:
+          PUSH_TOKEN: ${{ secrets.COPILOT_PUSH_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+          BRANCH=setup-rag-mop
+          git checkout -b "$BRANCH"
+
+          # README
+          cat > README.md <<'EOF'
+# Test Case Generator - RAG + Master Orchestration Prompt (starter)
+
+This repository contains starter code and templates for building a Retrieval-Augmented Generation (RAG) system with a Master Orchestration Prompt (MOP) to generate standard, repeatable test cases from acceptance criteria, Jira tickets, and other test artifacts (ISTQB PDFs, white papers, business rules, etc).
+
+Key components:
+- Ingest: extract text from PDFs/URLs/Jira and index into a vector store
+- Retriever: retrieve relevant chunks given input (AC, ticket, etc.)
+- Master Orchestration Prompt (MOP): a curated prompt template that orchestrates the LLM steps to produce standard test cases
+- Generator: coordinates retriever + MOP + LLM to produce final test cases
+- Evaluation: automated checks and human-in-the-loop feedback
+
+Getting started
+1. Add repo secrets (see ARCHITECTURE.md)
+2. Install dependencies (see requirements.txt)
+3. Configure vector DB (Chroma, Pinecone, Weaviate, or FAISS)
+4. Run ingestion over your PDFs and artifacts: `python -m src.ingest path/to/file.pdf`
+5. Run generation: `python -m src.generate --ticket "./examples/ticket.json"`
+
+See ARCHITECTURE.md for design decisions, and prompts/mop_template.md for the MOP.
+
+License: MIT
+EOF
+
+          # ARCHITECTURE.md
+          cat > ARCHITECTURE.md <<'EOF'
+# Architecture & Setup Notes
+
+Overview
+- Ingest pipeline: convert PDFs, HTML, Jira tickets, and spreadsheets into plain text, enrich with metadata (source, page, doc-type), chunk text, compute embeddings, and upsert to a vector store.
+- Vector store: persistent store for embeddings (Chroma, Pinecone, Weaviate, or FAISS on disk).
+- Retriever: semantic search layer returning top-N chunks plus metadata for context.
+- Re-ranker (optional): re-rank with cross-encoder or feed to LLM to pick best evidence pieces.
+- Master Orchestration Prompt (MOP): the prompt-engineering template that breaks the test-case generation into deterministic steps, validation checks, and output schema for consistent test cases.
+- Generator: calls retriever, builds the MOP with retrieved context, calls LLM(s) (candidate LLM + verifier LLM optionally), and outputs structured test cases (e.g., JSON, Gherkin).
+- Evaluation & feedback: automated static checks + human review loops to improve the MOP and retrieval.
+
+Recommended stack
+- Language: Python
+- LLM: OpenAI (gpt-4o/4o-mini) or Anthropic (Claude), or local LLM if needed
+- Embeddings: OpenAI embeddings or sentence-transformers
+- Vector DB: Chroma (local), FAISS (local), Pinecone/Weaviate (managed)
+- Orchestration libraries: LangChain or LlamaIndex (optional—these speed development)
+- PDF extraction: pypdf / PyMuPDF (fitz) / tika
+
+GitHub setup
+- Add repository secrets:
+  - OPENAI_API_KEY
+  - PINECONE_API_KEY / PINECONE_ENV (if using Pinecone)
+  - CHROMA_DB_DIR is optional (for local storage). If using S3 or remote storage include appropriate creds.
+  - JIRA_API_TOKEN + JIRA_USER (optional for Jira ingestion)
+- CI: validate lint, run unit tests, run a smoke test of generation (with a small, synthetic dataset)
+
+Security & data handling
+- Do NOT commit PDFs or PII into the repository. Use cloud storage (S3) or private artifact store and reference locations in metadata.
+- Consider using encryption and access controls for vector DB if it contains proprietary info.
+
+Input formats supported
+- Acceptance criteria (structured text)
+- Jira ticket JSON
+- PDF (standards: ISTQB, white papers)
+- HTML/webpages (URLs)
+- Business rules CSV/Excel
+
+Output schema (example JSON)
+{
+  "title": "...",
+  "preconditions": [...],
+  "test_steps": [
+    {"step": 1, "action": "...", "expected_result": "...", "data": {...}}
+  ],
+  "priority": "High/Medium/Low",
+  "tags": ["regression", "security"],
+  "source": "JIRA-1234",
+  "confidence": 0.87
+}
+EOF
+
+          # requirements and .gitignore
+          cat > requirements.txt <<'EOF'
+langchain>=0.0.400
+openai>=1.0.0
+tiktoken
+pypdf
+chromadb
+sentence-transformers
+faiss-cpu
+fastapi
+uvicorn
+pytest
+python-dotenv
+requests
+EOF
+
+          cat > .gitignore <<'EOF'
+.env
+__pycache
