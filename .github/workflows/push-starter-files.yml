@@ -86,20 +86,20 @@ jobs:
             const files = {
               'README.md': `# Test Case Generator - RAG + Master Orchestration Prompt (starter)
 
-This repository contains starter code and templates for building a Retrieval-Augmented Generation (RAG) system with a Master Orchestration Prompt (MOP) to generate standard, repeatable test cases from acceptance criteria, Jira tickets, and other test artifacts (ISTQB PDFs, white papers, business rules, etc).
+# This repository contains starter code and templates for building a Retrieval-Augmented Generation (RAG) system with a Master Orchestration Prompt (MOP) to generate standard, repeatable test cases from acceptance criteria, Jira tickets, and other test artifacts (ISTQB PDFs, white papers, business rules, etc).
 
-See ARCHITECTURE.md and prompts/mop_template.md for details.
-`,
+# See ARCHITECTURE.md and prompts/mop_template.md for details.
+# `,
 
-              'ARCHITECTURE.md': `# Architecture & Setup Notes
+              # 'ARCHITECTURE.md': `# Architecture & Setup Notes
 
-Overview
-- Ingest pipeline: convert PDFs, HTML, Jira tickets, and spreadsheets into plain text, enrich with metadata, chunk text, compute embeddings, and upsert to a vector store.
-- Vector store: Chroma, FAISS, Pinecone, or Weaviate recommended.
-- Use sentence-transformers or OpenAI embeddings; use an LLM as generator (OpenAI / Anthropic / local LLM).
+# Overview
+# - Ingest pipeline: convert PDFs, HTML, Jira tickets, and spreadsheets into plain text, enrich with metadata, chunk text, compute embeddings, and upsert to a vector store.
+# - Vector store: Chroma, FAISS, Pinecone, or Weaviate recommended.
+# - Use sentence-transformers or OpenAI embeddings; use an LLM as generator (OpenAI / Anthropic / local LLM).
 
-GitHub setup: add OPENAI_API_KEY and other secrets in repo Settings -> Secrets.
-`,
+# GitHub setup: add OPENAI_API_KEY and other secrets in repo Settings -> Secrets.
+# `,
 
               'requirements.txt': `langchain>=0.0.400
 openai>=1.0.0
