@@ -58,7 +58,7 @@ sample1_MOP_TestCaseCreator/
    python -m rag.ingest ./artifacts --config config/rag.yml --chunk-size 200 --overlap 40
    ```
 
-   The command walks the provided directory, converts artifacts to text with metadata, chunks the text, computes embeddings, and upserts them into the SQLite vector store.
+   The command walks the provided directory, converts artifacts to text with metadata, chunks the text, computes embeddings, and upserts them into the SQLite vector store. Supported artifacts are discovered regardless of file extension casing (for example, `.PDF`, `.HTML`, and `.CsV`).
 
 4. **Wire up the generator** by instantiating `TestCaseGenerator` with an LLM callable:
 

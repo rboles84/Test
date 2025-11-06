@@ -30,11 +30,12 @@ def discover_artifacts(paths: Iterable[Path]) -> List[Path]:
     resolved: List[Path] = []
     for path in paths:
         if path.is_dir():
-            for suffix in LOADER_MAPPING:
-                resolved.extend(sorted(path.rglob(f"*{suffix}")))
+            for candidate in path.rglob("*"):
+                if candidate.is_file() and candidate.suffix.lower() in LOADER_MAPPING:
+                    resolved.append(candidate)
         elif path.suffix.lower() in LOADER_MAPPING:
             resolved.append(path)
-    return resolved
+    return sorted(set(resolved))
 
 
 def load_records(path: Path) -> List[ArtifactRecord]:
