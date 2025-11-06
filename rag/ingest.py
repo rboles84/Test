@@ -12,6 +12,7 @@ from rag.ingestion.html_loader import HtmlLoader
 from rag.ingestion.jira_loader import JiraLoader
 from rag.ingestion.pdf_loader import PdfLoader
 from rag.ingestion.spreadsheet_loader import SpreadsheetLoader
+from rag.ingestion.text_loader import TextLoader
 from rag.models import ArtifactRecord, DocumentChunk
 from rag.vector_store import SQLiteVectorStore, VectorStoreConfig
 
@@ -20,6 +21,9 @@ LOADER_MAPPING = {
     ".html": HtmlLoader,
     ".htm": HtmlLoader,
     ".json": JiraLoader,
+    ".txt": TextLoader,
+    ".md": TextLoader,
+    ".markdown": TextLoader,
     ".csv": SpreadsheetLoader,
     ".xlsx": SpreadsheetLoader,
     ".xlsm": SpreadsheetLoader,

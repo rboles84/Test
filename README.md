@@ -30,6 +30,7 @@ rag/
     pdf_loader.py       # PDF ingestion using `pypdf`
     html_loader.py      # HTML ingestion with BeautifulSoup
     jira_loader.py      # Jira JSON export ingestion
+    text_loader.py      # Plain text and Markdown ingestion
     spreadsheet_loader.py  # CSV/XLSX ingestion via `csv` and `openpyxl`
     chunker.py          # Chunking utilities
 
@@ -52,7 +53,7 @@ sample1_MOP_TestCaseCreator/
    mkdir -p data
    ```
 
-3. **Ingest artifacts** (PDFs, HTML pages, Jira JSON exports, CSV/XLSX spreadsheets) using the CLI:
+3. **Ingest artifacts** (plain text/Markdown files, PDFs, HTML pages, Jira JSON exports, CSV/XLSX spreadsheets) using the CLI:
 
    ```bash
    python -m rag.ingest ./artifacts --config config/rag.yml --chunk-size 200 --overlap 40
